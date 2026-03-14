@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, Users, Briefcase, Image as ImageIcon,
-  Settings, LogOut, ChevronLeft, ChevronRight, DollarSign
+  Settings, LogOut, ChevronLeft, ChevronRight, DollarSign, Globe
 } from 'lucide-react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from './AuthContext';
@@ -14,12 +14,13 @@ const Sidebar = ({ expanded, setExpanded }: { expanded: boolean; setExpanded: (v
   const navigate   = useNavigate();
 
   const menuItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Dashboard',     path: '/admin' },
-    { icon: <DollarSign size={20} />,       label: 'Financeiro',    path: '/admin/finance' },
-    { icon: <ImageIcon size={20} />,         label: 'Galeria',       path: '/admin/gallery' },
-    { icon: <Users size={20} />,             label: 'Clientes',      path: '/admin/clients' },
-    { icon: <Briefcase size={20} />,         label: 'Serviços',      path: '/admin/services' },
-    { icon: <Settings size={20} />,          label: 'Configurações', path: '/admin/settings' },
+    { icon: <LayoutDashboard size={20} />, label: 'Dashboard',      path: '/admin' },
+    { icon: <DollarSign size={20} />,       label: 'Financeiro',     path: '/admin/finance' },
+    { icon: <ImageIcon size={20} />,         label: 'Galeria',        path: '/admin/gallery' },
+    { icon: <Users size={20} />,             label: 'Clientes',       path: '/admin/clients' },
+    { icon: <Briefcase size={20} />,         label: 'Serviços',       path: '/admin/services' },
+    { icon: <Globe size={20} />,             label: 'Página Pública', path: '/admin/page' },
+    { icon: <Settings size={20} />,          label: 'Configurações',  path: '/admin/settings' },
   ];
 
   return (
@@ -42,7 +43,7 @@ const Sidebar = ({ expanded, setExpanded }: { expanded: boolean; setExpanded: (v
         </button>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
         {menuItems.map(item => {
           const active = location.pathname === item.path;
           return (
@@ -56,7 +57,7 @@ const Sidebar = ({ expanded, setExpanded }: { expanded: boolean; setExpanded: (v
                   : 'text-slate-400 hover:bg-white/5 hover:text-white'
               )}
             >
-              <div className={cn('transition-transform duration-300', active ? 'scale-110' : 'group-hover:scale-110')}>
+              <div className={cn('transition-transform duration-300 shrink-0', active ? 'scale-110' : 'group-hover:scale-110')}>
                 {item.icon}
               </div>
               {expanded && <span className="font-bold tracking-tight whitespace-nowrap">{item.label}</span>}
