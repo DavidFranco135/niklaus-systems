@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  TrendingUp, Users, Briefcase, CreditCard, 
-  Clock, CheckCircle2, ArrowUpRight, ArrowDownRight 
+import {
+  TrendingUp, Users, Briefcase, CreditCard,
+  Clock, CheckCircle2, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-import { Stats } from './types';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
+import { Stats, Service } from './types';
 
 const StatCard = ({ title, value, icon, color, trend }: any) => (
   <div className="bg-white/[0.03] p-8 rounded-[2.5rem] border border-white/5 backdrop-blur-md">
@@ -12,7 +14,7 @@ const StatCard = ({ title, value, icon, color, trend }: any) => (
       <div className={`p-4 rounded-2xl ${color} bg-opacity-20`}>
         {React.cloneElement(icon, { className: color.replace('bg-', 'text-'), size: 24 })}
       </div>
-      {trend && (
+      {trend !== undefined && (
         <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black ${trend > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
           {trend > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
           {Math.abs(trend)}%
@@ -26,19 +28,38 @@ const StatCard = ({ title, value, icon, color, trend }: any) => (
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [finishedCount, setFinishedCount] = useState(0);
 
   useEffect(() => {
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then(data => setStats(data));
+    async function load() {
+      const [clientsSnap, servicesSnap] = await Promise.all([
+        getDocs(collection(db, 'clients')),
+        getDocs(collection(db, 'services')),
+      ]);
+
+      const services = servicesSnap.docs.map(d => d.data() as Service);
+      const total    = services.reduce((a, s) => a + (s.total_value || 0), 0);
+      const paid     = services.reduce((a, s) => a + (s.paid_value  || 0), 0);
+      const finished = services.filter(s => s.status === 'finished').length;
+
+      setFinishedCount(finished);
+      setStats({
+        clients: clientsSnap.size,
+        services: servicesSnap.size,
+        finances: { total, paid, remaining: total - paid },
+      });
+    }
+    load();
   }, []);
 
-  if (!stats) return <div className="animate-pulse space-y-8">
-    <div className="h-10 w-64 bg-white/5 rounded-2xl"></div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {[1,2,3,4].map(i => <div key={i} className="h-44 bg-white/5 rounded-[2.5rem]"></div>)}
+  if (!stats) return (
+    <div className="animate-pulse space-y-8">
+      <div className="h-10 w-64 bg-white/5 rounded-2xl" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[1,2,3,4].map(i => <div key={i} className="h-44 bg-white/5 rounded-[2.5rem]" />)}
+      </div>
     </div>
-  </div>;
+  );
 
   return (
     <div className="space-y-12">
@@ -57,32 +78,20 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Clientes" 
-          value={stats.clients} 
-          icon={<Users size={20} />} 
-          color="bg-indigo-400" 
-          trend={12}
-        />
-        <StatCard 
-          title="Projetos" 
-          value={stats.services} 
-          icon={<Briefcase size={20} />} 
-          color="bg-purple-400" 
-          trend={5}
-        />
-        <StatCard 
-          title="Receita" 
-          value={`R$ ${stats.finances.total.toLocaleString()}`} 
-          icon={<TrendingUp size={20} />} 
-          color="bg-emerald-400" 
+        <StatCard title="Clientes"  value={stats.clients}  icon={<Users size={20} />}    color="bg-indigo-400" trend={12} />
+        <StatCard title="Projetos"  value={stats.services} icon={<Briefcase size={20} />} color="bg-purple-400" trend={5} />
+        <StatCard
+          title="Receita"
+          value={`R$ ${stats.finances.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          icon={<TrendingUp size={20} />}
+          color="bg-emerald-400"
           trend={8}
         />
-        <StatCard 
-          title="Pendente" 
-          value={`R$ ${stats.finances.remaining.toLocaleString()}`} 
-          icon={<CreditCard size={20} />} 
-          color="bg-amber-400" 
+        <StatCard
+          title="Pendente"
+          value={`R$ ${stats.finances.remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          icon={<CreditCard size={20} />}
+          color="bg-amber-400"
           trend={-2}
         />
       </div>
@@ -94,28 +103,32 @@ export default function AdminDashboard() {
             <div>
               <div className="flex justify-between text-sm mb-4">
                 <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Capital Realizado</span>
-                <span className="font-black text-emerald-400">R$ {stats.finances.paid.toLocaleString()}</span>
+                <span className="font-black text-emerald-400">
+                  R$ {stats.finances.paid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
               </div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${(stats.finances.paid / stats.finances.total) * 100}%` }}
-                  transition={{ duration: 1, ease: "easeOut" }}
-                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" 
+                  animate={{ width: `${stats.finances.total > 0 ? (stats.finances.paid / stats.finances.total) * 100 : 0}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
                 />
               </div>
             </div>
             <div>
               <div className="flex justify-between text-sm mb-4">
                 <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Capital Projetado</span>
-                <span className="font-black text-indigo-400">R$ {stats.finances.remaining.toLocaleString()}</span>
+                <span className="font-black text-indigo-400">
+                  R$ {stats.finances.remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
               </div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${(stats.finances.remaining / stats.finances.total) * 100}%` }}
-                  transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-400 rounded-full" 
+                  animate={{ width: `${stats.finances.total > 0 ? (stats.finances.remaining / stats.finances.total) * 100 : 0}%` }}
+                  transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
+                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-400 rounded-full"
                 />
               </div>
             </div>
@@ -129,14 +142,14 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-4 p-4 bg-white/10 rounded-2xl border border-white/10">
               <div className="p-3 bg-white/20 rounded-xl text-white"><Clock size={20} /></div>
               <div>
-                <p className="text-white font-bold text-lg">{stats.services}</p>
+                <p className="text-white font-bold text-lg">{stats.services - finishedCount}</p>
                 <p className="text-indigo-100 text-xs font-medium uppercase tracking-widest">Em Desenvolvimento</p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 bg-white/10 rounded-2xl border border-white/10">
               <div className="p-3 bg-white/20 rounded-xl text-white"><CheckCircle2 size={20} /></div>
               <div>
-                <p className="text-white font-bold text-lg">12</p>
+                <p className="text-white font-bold text-lg">{finishedCount}</p>
                 <p className="text-indigo-100 text-xs font-medium uppercase tracking-widest">Entregues com Sucesso</p>
               </div>
             </div>
