@@ -1,80 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  LayoutDashboard, Users, Briefcase, Image as ImageIcon, 
-  Settings, LogOut, ChevronLeft, ChevronRight,
-  TrendingUp, CreditCard, Clock, CheckCircle2,
-  Plus, Search, Edit2, Trash2, MoreVertical, DollarSign
+import {
+  LayoutDashboard, Users, Briefcase, Image as ImageIcon,
+  Settings, LogOut, ChevronLeft, ChevronRight, DollarSign
 } from 'lucide-react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { cn } from './lib/utils';
 
-const Sidebar = ({ expanded, setExpanded }: { expanded: boolean, setExpanded: (v: boolean) => void }) => {
+const Sidebar = ({ expanded, setExpanded }: { expanded: boolean; setExpanded: (v: boolean) => void }) => {
   const { logout } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location   = useLocation();
+  const navigate   = useNavigate();
 
   const menuItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/admin' },
-    { icon: <DollarSign size={20} />, label: 'Financeiro', path: '/admin/finance' },
-    { icon: <ImageIcon size={20} />, label: 'Galeria', path: '/admin/gallery' },
-    { icon: <Users size={20} />, label: 'Clientes', path: '/admin/clients' },
-    { icon: <Briefcase size={20} />, label: 'Serviços', path: '/admin/services' },
-    { icon: <Settings size={20} />, label: 'Configurações', path: '/admin/settings' },
+    { icon: <LayoutDashboard size={20} />, label: 'Dashboard',     path: '/admin' },
+    { icon: <DollarSign size={20} />,       label: 'Financeiro',    path: '/admin/finance' },
+    { icon: <ImageIcon size={20} />,         label: 'Galeria',       path: '/admin/gallery' },
+    { icon: <Users size={20} />,             label: 'Clientes',      path: '/admin/clients' },
+    { icon: <Briefcase size={20} />,         label: 'Serviços',      path: '/admin/services' },
+    { icon: <Settings size={20} />,          label: 'Configurações', path: '/admin/settings' },
   ];
 
   return (
     <motion.aside
       initial={false}
       animate={{ width: expanded ? 280 : 88 }}
-      className="h-screen bg-[#0a0a0a] border-r border-white/5 flex flex-col sticky top-0 z-40 transition-all duration-500 ease-[0.16, 1, 0.3, 1]"
+      className="h-screen bg-[#0a0a0a] border-r border-white/5 flex flex-col sticky top-0 z-40"
     >
       <div className="p-6 flex items-center justify-between mb-8">
-        {expanded && <span className="text-xl font-display font-bold tracking-tighter text-white">NIKLAUS<span className="text-indigo-500">.</span></span>}
-        <button 
+        {expanded && (
+          <span className="text-xl font-display font-bold tracking-tighter text-white">
+            NIKLAUS<span className="text-indigo-500">.</span>
+          </span>
+        )}
+        <button
           onClick={() => setExpanded(!expanded)}
-          className="p-2.5 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white transition-all"
+          className="p-2.5 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white transition-all ml-auto"
         >
           {expanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
         </button>
       </div>
 
-      <nav className="flex-1 px-4 space-y-2">
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={cn(
-              "flex items-center gap-4 p-4 rounded-2xl transition-all group relative overflow-hidden",
-              location.pathname === item.path 
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" 
-                : "text-slate-400 hover:bg-white/5 hover:text-white"
-            )}
-          >
-            <div className={cn(
-              "transition-transform duration-500",
-              location.pathname === item.path ? "scale-110" : "group-hover:scale-110"
-            )}>
-              {item.icon}
-            </div>
-            {expanded && <span className="font-bold tracking-tight">{item.label}</span>}
-            {location.pathname === item.path && (
-              <motion.div 
-                layoutId="active-pill"
-                className="absolute left-0 w-1 h-6 bg-white rounded-r-full"
-              />
-            )}
-          </Link>
-        ))}
+      <nav className="flex-1 px-4 space-y-1">
+        {menuItems.map(item => {
+          const active = location.pathname === item.path;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                'flex items-center gap-4 p-4 rounded-2xl transition-all group relative overflow-hidden',
+                active
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              )}
+            >
+              <div className={cn('transition-transform duration-300', active ? 'scale-110' : 'group-hover:scale-110')}>
+                {item.icon}
+              </div>
+              {expanded && <span className="font-bold tracking-tight whitespace-nowrap">{item.label}</span>}
+              {active && (
+                <motion.div layoutId="active-pill" className="absolute left-0 w-1 h-6 bg-white rounded-r-full" />
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="p-4 mt-auto border-t border-white/5">
         <button
-          onClick={() => {
-            logout();
-            navigate('/');
-          }}
+          onClick={async () => { await logout(); navigate('/'); }}
           className="w-full flex items-center gap-4 p-4 rounded-2xl text-rose-400 hover:bg-rose-500/10 transition-all group"
         >
           <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
@@ -87,16 +83,18 @@ const Sidebar = ({ expanded, setExpanded }: { expanded: boolean, setExpanded: (v
 
 export default function AdminLayout() {
   const [expanded, setExpanded] = useState(true);
-  const { user, isLoading } = useAuth();
-  const navigate = useNavigate();
+  const { user, isLoading }     = useAuth();
+  const navigate                = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      navigate('/login');
-    }
+    if (!isLoading && !user) navigate('/login');
   }, [user, isLoading, navigate]);
 
-  if (isLoading || !user) return null;
+  if (isLoading || !user) return (
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen bg-[#050505] text-slate-200">
