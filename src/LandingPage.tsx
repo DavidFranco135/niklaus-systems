@@ -1,495 +1,460 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Menu, X, Code2, Rocket, Shield, Users, 
-  ArrowRight, Github, Linkedin, Mail, MessageSquare,
-  Smartphone, Globe, Database, Layout, Folder
+import React, { useEffect, useState, useRef } from 'react';
+import { motion, useInView } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowRight, ExternalLink, Code2, Smartphone, Globe,
+  Layers, ChevronDown, X, ChevronLeft, ChevronRight,
+  Mail, Instagram, Github, Linkedin, Menu, Shield
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { collection, getDocs, doc, getDoc, orderBy, query } from 'firebase/firestore';
+import { db } from './firebase';
 import { GalleryItem } from './types';
 
-const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+// ── Animated section wrapper ─────────────────────────────────────────────────
+const Section = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+const Lightbox = ({
+  item, onClose,
+}: { item: GalleryItem; onClose: () => void }) => {
+  const [idx, setIdx] = useState(0);
+  const images = [item.url, ...(item.images?.map(i => i.url) || [])];
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const navLinks = [
-    { name: 'Início', href: '#home' },
-    { name: 'Sobre', href: '#about' },
-    { name: 'Serviços', href: '#services' },
-    { name: 'Portfólio', href: '#portfolio' },
-    { name: 'Contato', href: '#contact' },
-  ];
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight') setIdx(p => (p + 1) % images.length);
+      if (e.key === 'ArrowLeft') setIdx(p => (p - 1 + images.length) % images.length);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [images.length]);
 
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-500 ${scrolled ? 'bg-black/60 backdrop-blur-xl border-b border-white/5 py-4' : 'bg-transparent py-6'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center">
-            <span className="text-2xl font-display font-bold tracking-tighter text-white">NIKLAUS<span className="text-indigo-500">.</span></span>
-          </div>
-          
-          <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-8">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="text-slate-400 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-all hover:tracking-widest"
-                >
-                  {link.name}
-                </a>
-              ))}
-              <Link to="/login" className="bg-white text-black px-6 py-2 rounded-full text-sm font-bold hover:bg-indigo-500 hover:text-white transition-all shadow-xl shadow-white/5">
-                Admin
-              </Link>
-            </div>
-          </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <button className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-all" onClick={onClose}>
+        <X size={24} />
+      </button>
 
-          <div className="md:hidden">
-            <button onClick={() => setIsOpen(!isOpen)} className="text-white p-2">
-              {isOpen ? <X size={28} /> : <Menu size={28} />}
+      <div className="w-full max-w-5xl" onClick={e => e.stopPropagation()}>
+        <motion.img
+          key={idx}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          src={images[idx]}
+          alt={item.title}
+          className="w-full max-h-[70vh] object-contain rounded-3xl"
+          referrerPolicy="no-referrer"
+        />
+
+        {images.length > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <button
+              onClick={() => setIdx(p => (p - 1 + images.length) % images.length)}
+              className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-all"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="flex gap-2">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setIdx(i)}
+                  className={`w-2 h-2 rounded-full transition-all ${i === idx ? 'bg-indigo-500 w-6' : 'bg-white/20'}`}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => setIdx(p => (p + 1) % images.length)}
+              className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-all"
+            >
+              <ChevronRight size={20} />
             </button>
           </div>
+        )}
+
+        <div className="mt-6 text-center">
+          <h3 className="text-2xl font-bold text-white tracking-tight">{item.title}</h3>
+          {item.description && <p className="text-slate-400 mt-2 max-w-xl mx-auto">{item.description}</p>}
         </div>
       </div>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-black/95 backdrop-blur-2xl border-b border-white/10 overflow-hidden"
-          >
-            <div className="px-4 pt-4 pb-8 space-y-2">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setIsOpen(false)}
-                  className="text-slate-300 hover:text-white block px-4 py-4 text-lg font-medium border-b border-white/5 last:border-0"
-                >
-                  {link.name}
-                </a>
-              ))}
-              <Link to="/login" className="block w-full text-center bg-indigo-600 text-white px-5 py-4 mt-6 rounded-2xl text-lg font-bold">
-                Acesso Admin
-              </Link>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
+    </motion.div>
   );
 };
 
-const Hero = ({ coverPhoto }: { coverPhoto?: string }) => (
-  <section id="home" className="relative pt-32 pb-20 lg:pt-56 lg:pb-40 overflow-hidden">
-    {/* Atmospheric Background */}
-    <div className="absolute top-0 left-0 w-full h-full -z-10">
-      {coverPhoto && (
-        <div className="absolute inset-0">
-          <img 
-            src={coverPhoto} 
-            alt="Cover" 
-            className="w-full h-full object-cover opacity-50" 
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-transparent to-[#050505]" />
-        </div>
-      )}
-      <div className="absolute top-[10%] left-[10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '2s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
-    </div>
-    
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <div className="inline-flex items-center gap-2 py-2 px-4 rounded-full bg-white/5 border border-white/10 text-indigo-400 text-xs font-bold tracking-widest uppercase mb-8 backdrop-blur-md">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-          </span>
-          Sistemas de Próxima Geração
-        </div>
-        <h1 className="text-6xl md:text-8xl font-display font-bold text-white mb-8 leading-[0.9] tracking-tighter">
-          DESIGNING THE <br />
-          <span className="text-gradient">FUTURE OF TECH</span>
-        </h1>
-        <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed font-light">
-          Arquitetura de software impecável, interfaces imersivas e performance sem precedentes. Elevamos sua visão ao estado da arte digital.
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-          <a href="#portfolio" className="w-full sm:w-auto px-10 py-5 bg-white text-black rounded-2xl font-black hover:bg-indigo-500 hover:text-white transition-all shadow-2xl shadow-white/5 flex items-center justify-center gap-3 group">
-            EXPLORAR PROJETOS <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
-          </a>
-          <a href="#contact" className="w-full sm:w-auto px-10 py-5 bg-white/5 text-white border border-white/10 rounded-2xl font-bold hover:bg-white/10 transition-all backdrop-blur-md flex items-center justify-center gap-2">
-            INICIAR CONSULTORIA
-          </a>
-        </div>
-      </motion.div>
-    </div>
-  </section>
-);
+// ── Main Component ─────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const navigate          = useNavigate();
+  const [cover, setCover] = useState('https://picsum.photos/seed/niklaus-dark/1920/1080');
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [selected, setSelected] = useState<GalleryItem | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-const Services = () => {
+  useEffect(() => {
+    // Load settings
+    getDoc(doc(db, 'settings', 'company')).then(snap => {
+      if (snap.exists() && snap.data().cover_photo) setCover(snap.data().cover_photo);
+    });
+
+    // Load gallery
+    getDocs(query(collection(db, 'gallery'), orderBy('created_at', 'desc'))).then(snap => {
+      setGallery(snap.docs.map(d => ({ id: d.id, ...d.data() } as GalleryItem)));
+    });
+  }, []);
+
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    setMenuOpen(false);
+  };
+
   const services = [
-    {
-      icon: <Smartphone className="text-indigo-400" size={32} />,
-      title: 'Mobile Apps',
-      desc: 'Experiências mobile fluidas com React Native e Swift, focadas em retenção.'
-    },
-    {
-      icon: <Globe className="text-purple-400" size={32} />,
-      title: 'Web Platforms',
-      desc: 'Sistemas web de alta performance com Next.js e arquiteturas serverless.'
-    },
-    {
-      icon: <Database className="text-blue-400" size={32} />,
-      title: 'Cloud Systems',
-      desc: 'Infraestrutura escalável e segura para processamento massivo de dados.'
-    },
-    {
-      icon: <Layout className="text-emerald-400" size={32} />,
-      title: 'Product Design',
-      desc: 'Design estratégico que une estética minimalista e usabilidade extrema.'
-    }
+    { icon: <Globe size={28} />, title: 'Desenvolvimento Web', desc: 'Sites institucionais, landing pages e sistemas web modernos com foco em performance e conversão.' },
+    { icon: <Smartphone size={28} />, title: 'Apps Mobile', desc: 'Aplicativos iOS e Android com React Native, entregando experiências nativas de alta qualidade.' },
+    { icon: <Code2 size={28} />, title: 'Sistemas & APIs', desc: 'Backends robustos, integrações e APIs REST escaláveis para o seu negócio crescer.' },
+    { icon: <Layers size={28} />, title: 'UI/UX Design', desc: 'Interfaces elegantes, responsivas e centradas no usuário que convertem e encantam.' },
   ];
 
   return (
-    <section id="services" className="py-32 bg-[#080808] relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
-          <div className="max-w-xl">
-            <h2 className="text-4xl md:text-6xl font-display font-bold text-white mb-6 tracking-tighter">NOSSAS <br />ESPECIALIDADES</h2>
-            <p className="text-slate-400 text-lg">Dominamos as tecnologias mais avançadas para entregar resultados que superam expectativas.</p>
-          </div>
-          <div className="hidden md:block h-px flex-1 bg-white/10 mx-12 mb-6" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {services.map((s, i) => (
-            <motion.div
-              key={i}
-              whileHover={{ y: -10 }}
-              className="p-10 rounded-[2.5rem] border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all group"
-            >
-              <div className="mb-8 p-5 bg-white/5 rounded-3xl w-fit group-hover:scale-110 transition-transform">{s.icon}</div>
-              <h3 className="text-2xl font-bold text-white mb-4 tracking-tight">{s.title}</h3>
-              <p className="text-slate-500 leading-relaxed font-light">{s.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
+    <div className="min-h-screen bg-[#050505] text-slate-200 overflow-x-hidden">
+      {/* ── NAV ─────────────────────────────────────────────────────────── */}
+      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between bg-black/40 backdrop-blur-2xl border border-white/5 rounded-2xl px-6 py-3">
+          <span className="text-xl font-display font-bold tracking-tighter text-white">
+            NIKLAUS<span className="text-indigo-500">.</span>
+          </span>
 
-const Portfolio = () => {
-  const [items, setItems] = useState<GalleryItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
-
-  useEffect(() => {
-    fetch('/api/gallery')
-      .then(res => res.json())
-      .then(data => setItems(data));
-  }, []);
-
-  return (
-    <section id="portfolio" className="py-32 bg-[#050505]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-24">
-          <h2 className="text-4xl md:text-6xl font-display font-bold text-white mb-6 tracking-tighter uppercase">Showcase</h2>
-          <div className="w-24 h-1 bg-indigo-500 mx-auto rounded-full" />
-        </div>
-        
-        {items.length === 0 ? (
-          <div className="text-center py-32 bg-white/[0.02] rounded-[3rem] border border-dashed border-white/10">
-            <p className="text-slate-500 font-light italic">Aguardando novos lançamentos...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
-            {items.map((item, idx) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="group cursor-pointer"
-                onClick={() => setSelectedItem(item)}
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-8">
+            {['sobre', 'servicos', 'portfolio', 'contato'].map(s => (
+              <button
+                key={s}
+                onClick={() => scrollTo(s)}
+                className="text-sm font-bold text-slate-400 hover:text-white transition-colors capitalize tracking-wide"
               >
-                {/* Folder Tab Effect */}
-                <div className="flex items-end ml-8">
-                  <div className="h-8 w-32 bg-white/5 border-t border-l border-r border-white/10 rounded-t-2xl flex items-center justify-center gap-2">
-                    <Folder size={12} className="text-indigo-400" />
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">PROJETO</span>
-                  </div>
-                </div>
-
-                <div className="relative aspect-[16/10] overflow-hidden rounded-[2.5rem] rounded-tl-none mb-8 bg-slate-900 border border-white/10 group-hover:border-indigo-500/50 transition-colors shadow-2xl">
-                  {item.type === 'image' ? (
-                    <img 
-                      src={item.url} 
-                      alt={item.title} 
-                      className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Rocket className="text-white/10" size={80} />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-12">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center">
-                        <ArrowRight size={20} />
-                      </div>
-                      <span className="text-white font-bold tracking-widest text-sm uppercase">Explorar Case</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="px-8">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-3xl font-display font-bold text-white mb-2 tracking-tight group-hover:text-indigo-400 transition-colors">{item.title}</h3>
-                      <div className="flex items-center gap-3">
-                        <span className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-widest">
-                          {item.type}
-                        </span>
-                        <span className="text-slate-600 text-[10px] font-bold uppercase tracking-widest">
-                          {new Date(item.created_at).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  {item.description && (
-                    <p className="text-slate-400 leading-relaxed font-light line-clamp-2 text-sm">
-                      {item.description}
-                    </p>
-                  )}
-                </div>
-              </motion.div>
+                {s === 'servicos' ? 'Serviços' : s === 'portfolio' ? 'Portfólio' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
             ))}
           </div>
-        )}
-      </div>
 
-      <AnimatePresence>
-        {selectedItem && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-8"
-          >
-            <div className="absolute inset-0 bg-black/95 backdrop-blur-2xl" onClick={() => setSelectedItem(null)} />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-6xl bg-[#0a0a0a] rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl flex flex-col lg:flex-row max-h-[90vh]"
+          <div className="hidden md:flex items-center gap-3">
+            <button
+              onClick={() => navigate('/login')}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-black text-slate-500 hover:text-indigo-400 uppercase tracking-widest transition-colors"
             >
-              <button 
-                onClick={() => setSelectedItem(null)}
-                className="absolute top-6 right-6 z-10 p-4 bg-white/5 hover:bg-white/10 rounded-full text-white transition-all"
-              >
-                <X size={24} />
+              <Shield size={14} /> Admin
+            </button>
+            <button
+              onClick={() => scrollTo('contato')}
+              className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
+            >
+              Contato
+            </button>
+          </div>
+
+          {/* Mobile menu */}
+          <button className="md:hidden p-2 text-slate-400" onClick={() => setMenuOpen(!menuOpen)}>
+            <Menu size={22} />
+          </button>
+        </div>
+
+        {menuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="md:hidden mt-2 mx-auto max-w-6xl bg-black/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 flex flex-col gap-4"
+          >
+            {['sobre', 'servicos', 'portfolio', 'contato'].map(s => (
+              <button key={s} onClick={() => scrollTo(s)} className="text-left text-white font-bold capitalize py-2 border-b border-white/5">
+                {s === 'servicos' ? 'Serviços' : s === 'portfolio' ? 'Portfólio' : s.charAt(0).toUpperCase() + s.slice(1)}
               </button>
-
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-8 lg:p-12">
-                <div className="space-y-8">
-                  <div className="aspect-video rounded-[2rem] overflow-hidden bg-white/5">
-                    {selectedItem.type === 'image' ? (
-                      <img src={selectedItem.url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Rocket size={100} className="text-white/10" />
-                      </div>
-                    )}
-                  </div>
-                  
-                  {selectedItem.images && selectedItem.images.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {selectedItem.images.map((img) => (
-                        <div key={img.id} className="aspect-square rounded-2xl overflow-hidden bg-white/5 border border-white/5">
-                          <img src={img.url} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="w-full lg:w-[400px] bg-white/[0.02] border-l border-white/5 p-8 lg:p-12 overflow-y-auto custom-scrollbar">
-                <div className="space-y-8">
-                  <div>
-                    <span className="text-indigo-400 font-bold tracking-[0.3em] uppercase text-[10px] mb-2 block">Projeto</span>
-                    <h2 className="text-3xl font-display font-bold text-white tracking-tight">{selectedItem.title}</h2>
-                  </div>
-                  
-                  {selectedItem.description && (
-                    <div>
-                      <span className="text-slate-500 font-bold tracking-[0.3em] uppercase text-[10px] mb-4 block">Sobre o Projeto</span>
-                      <p className="text-slate-400 leading-relaxed font-light whitespace-pre-wrap">
-                        {selectedItem.description}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="pt-8 border-t border-white/5">
-                    <button 
-                      onClick={() => {
-                        setSelectedItem(null);
-                        window.location.href = '#contact';
-                      }}
-                      className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all"
-                    >
-                      SOLICITAR ORÇAMENTO
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+            ))}
+            <button onClick={() => navigate('/login')} className="text-left text-slate-500 font-bold text-sm uppercase tracking-widest">
+              Área Admin
+            </button>
           </motion.div>
         )}
-      </AnimatePresence>
-    </section>
-  );
-};
+      </nav>
 
-const Contact = () => (
-  <section id="contact" className="py-32 bg-[#080808] border-t border-white/5">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-        <div>
-          <h2 className="text-5xl md:text-7xl font-display font-bold text-white mb-8 tracking-tighter">VAMOS <br />CONSTRUIR?</h2>
-          <p className="text-slate-400 text-xl mb-12 font-light leading-relaxed">
-            Seja um MVP ou uma plataforma global, estamos prontos para o desafio. Entre em contato e transforme sua ideia em código.
-          </p>
-          <div className="space-y-8">
-            <div className="flex items-center gap-6 group">
-              <div className="p-5 bg-white/5 rounded-[1.5rem] text-indigo-400 border border-white/5 group-hover:bg-indigo-500 group-hover:text-white transition-all"><Mail size={24} /></div>
-              <div>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1">E-mail</p>
-                <p className="text-white font-medium text-lg">contato@niklaus.tech</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-6 group">
-              <div className="p-5 bg-white/5 rounded-[1.5rem] text-emerald-400 border border-white/5 group-hover:bg-emerald-500 group-hover:text-white transition-all"><MessageSquare size={24} /></div>
-              <div>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-1">WhatsApp</p>
-                <p className="text-white font-medium text-lg">+55 (11) 99999-9999</p>
-              </div>
-            </div>
-          </div>
+      {/* ── HERO ─────────────────────────────────────────────────────────── */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Cover image */}
+        <div className="absolute inset-0">
+          <img src={cover} alt="Cover" className="w-full h-full object-cover opacity-20" referrerPolicy="no-referrer" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-transparent to-[#050505]" />
         </div>
-        <div className="bg-white/[0.02] border border-white/5 p-12 rounded-[4rem] backdrop-blur-md">
-          <form className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-2">Nome</label>
-                <input type="text" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500 transition-colors" placeholder="Seu nome" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-2">Telefone</label>
-                <input type="tel" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500 transition-colors" placeholder="+55 (11) 99999-9999" />
-              </div>
+
+        {/* Glow orbs */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
+
+        <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <span className="inline-block px-4 py-1.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-black uppercase tracking-[0.2em] mb-8">
+              Software Development
+            </span>
+            <h1 className="text-5xl sm:text-7xl md:text-8xl font-display font-bold tracking-tighter text-white mb-6 leading-[0.9]">
+              Construindo o<br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-blue-400">
+                futuro digital
+              </span>
+            </h1>
+            <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
+              Desenvolvimento de software sob medida — web, mobile e sistemas — com design que encanta e tecnologia que performa.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <button
+                onClick={() => scrollTo('portfolio')}
+                className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-500 transition-all shadow-2xl shadow-indigo-500/30 flex items-center gap-2 group"
+              >
+                Ver Projetos <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button
+                onClick={() => scrollTo('contato')}
+                className="px-8 py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-bold hover:bg-white/10 transition-all"
+              >
+                Falar Comigo
+              </button>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-2">E-mail</label>
-              <input type="email" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500 transition-colors" placeholder="seu@email.com" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-2">Mensagem</label>
-              <textarea rows={4} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500 transition-colors resize-none" placeholder="Conte-nos sobre seu projeto" />
-            </div>
-            <button className="w-full bg-white text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-2xl shadow-white/5">
-              Enviar Mensagem
-            </button>
-          </form>
+          </motion.div>
         </div>
-      </div>
-    </div>
-  </section>
-);
 
-const Footer = () => (
-  <footer className="py-20 bg-[#050505] border-t border-white/5">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-12">
-        <div>
-          <span className="text-3xl font-display font-bold text-white tracking-tighter">NIKLAUS<span className="text-indigo-500">.</span></span>
-          <p className="text-slate-500 mt-4 text-sm font-light">© 2024 Niklaus Engineering. Crafted with precision.</p>
-        </div>
-        <div className="flex gap-4">
-          {[Github, Linkedin, Mail].map((Icon, i) => (
-            <a key={i} href="#" className="w-14 h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all">
-              <Icon size={24} />
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  </footer>
-);
+        <button
+          onClick={() => scrollTo('sobre')}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 text-slate-500 hover:text-white transition-colors animate-bounce"
+        >
+          <ChevronDown size={28} />
+        </button>
+      </section>
 
-export default function LandingPage() {
-  const [settings, setSettings] = useState<any>({});
-
-  useEffect(() => {
-    fetch('/api/settings')
-      .then(res => res.json())
-      .then(data => setSettings(data));
-  }, []);
-
-  return (
-    <div className="min-h-screen selection:bg-indigo-500 selection:text-white">
-      <Navbar />
-      <Hero coverPhoto={settings.cover_photo} />
-      <section id="about" className="py-32 bg-[#050505] relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center gap-24">
-            <div className="flex-1 relative">
-              <div className="relative z-10 rounded-[4rem] overflow-hidden border border-white/10 shadow-2xl">
-                <img src="https://picsum.photos/seed/niklaus-dark/1000/1200" alt="About Niklaus" className="w-full h-auto grayscale hover:grayscale-0 transition-all duration-1000" referrerPolicy="no-referrer" />
-              </div>
-              <div className="absolute -top-12 -left-12 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] -z-10" />
-            </div>
-            <div className="flex-1">
-              <span className="text-indigo-400 font-bold tracking-[0.3em] uppercase text-xs mb-6 block">A Vanguarda</span>
-              <h2 className="text-5xl md:text-7xl font-display font-bold text-white mb-8 tracking-tighter leading-tight">CÓDIGO QUE <br />RESPIRA DESIGN.</h2>
-              <p className="text-slate-400 text-xl mb-10 leading-relaxed font-light">
-                Não somos apenas uma software house. Somos um laboratório de inovação onde a estética encontra a funcionalidade bruta. Cada linha de código é escrita com o propósito de criar impacto.
+      {/* ── SOBRE ────────────────────────────────────────────────────────── */}
+      <section id="sobre" className="py-32 px-6">
+        <div className="max-w-6xl mx-auto">
+          <Section className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 block">Quem sou eu</span>
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-white tracking-tighter mb-6">
+                Transformo ideias em produtos digitais reais
+              </h2>
+              <p className="text-slate-400 text-lg leading-relaxed mb-6">
+                Sou um desenvolvedor full-stack apaixonado por criar experiências digitais excepcionais. Com foco em código limpo, design moderno e entregas que superam expectativas.
               </p>
-              <div className="grid grid-cols-2 gap-12">
-                <div>
-                  <h4 className="text-5xl font-display font-bold text-white mb-2">50+</h4>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Sistemas Ativos</p>
-                </div>
-                <div>
-                  <h4 className="text-5xl font-display font-bold text-white mb-2">08+</h4>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Países Atendidos</p>
-                </div>
+              <p className="text-slate-500 leading-relaxed mb-10">
+                De startups a grandes empresas, cada projeto recebe atenção total — da arquitetura ao pixel final. Tecnologia como ferramenta para transformar negócios reais.
+              </p>
+              <div className="grid grid-cols-3 gap-6">
+                {[
+                  { num: '50+', label: 'Projetos entregues' },
+                  { num: '3+', label: 'Anos de experiência' },
+                  { num: '100%', label: 'Satisfação garantida' },
+                ].map(stat => (
+                  <div key={stat.label}>
+                    <p className="text-3xl font-display font-bold text-white">{stat.num}</p>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">{stat.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
+            <div className="relative">
+              <div className="aspect-square rounded-[3rem] bg-gradient-to-br from-indigo-600/20 to-purple-600/10 border border-white/5 flex items-center justify-center overflow-hidden">
+                <img
+                  src={cover}
+                  alt="Profile"
+                  className="w-full h-full object-cover opacity-60 mix-blend-luminosity"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
+              </div>
+              <div className="absolute -bottom-6 -right-6 p-6 bg-indigo-600 rounded-3xl shadow-2xl shadow-indigo-600/30">
+                <Code2 size={32} className="text-white" />
+              </div>
+            </div>
+          </Section>
+        </div>
+      </section>
+
+      {/* ── SERVIÇOS ─────────────────────────────────────────────────────── */}
+      <section id="servicos" className="py-32 px-6 bg-white/[0.01]">
+        <div className="max-w-6xl mx-auto">
+          <Section className="text-center mb-20">
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 block">O que ofereço</span>
+            <h2 className="text-4xl md:text-5xl font-display font-bold text-white tracking-tighter">
+              Serviços especializados
+            </h2>
+          </Section>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {services.map((s, i) => (
+              <Section key={i}>
+                <div className="group p-8 bg-white/[0.02] rounded-[2.5rem] border border-white/5 hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all cursor-default h-full">
+                  <div className="p-4 bg-indigo-500/10 text-indigo-400 rounded-2xl w-fit mb-6 group-hover:bg-indigo-500/20 transition-all">
+                    {s.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-3 tracking-tight">{s.title}</h3>
+                  <p className="text-slate-400 leading-relaxed">{s.desc}</p>
+                </div>
+              </Section>
+            ))}
           </div>
         </div>
       </section>
-      <Services />
-      <Portfolio />
-      <Contact />
-      <Footer />
+
+      {/* ── PORTFÓLIO ────────────────────────────────────────────────────── */}
+      <section id="portfolio" className="py-32 px-6">
+        <div className="max-w-6xl mx-auto">
+          <Section className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-16">
+            <div>
+              <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 block">Meu trabalho</span>
+              <h2 className="text-4xl md:text-5xl font-display font-bold text-white tracking-tighter">
+                Projetos em destaque
+              </h2>
+            </div>
+            <p className="text-slate-400 max-w-xs text-sm leading-relaxed">
+              Cada projeto é uma história de parceria, desafio e resultado. Clique para ver os detalhes.
+            </p>
+          </Section>
+
+          {gallery.length === 0 ? (
+            <Section className="text-center py-20 text-slate-600">
+              <p className="text-lg">Projetos em breve...</p>
+            </Section>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {gallery.map((item, i) => (
+                <Section key={item.id}>
+                  <motion.div
+                    whileHover={{ y: -4 }}
+                    onClick={() => setSelected(item)}
+                    className="group cursor-pointer bg-white/[0.02] rounded-[2.5rem] border border-white/5 overflow-hidden hover:border-indigo-500/20 transition-all"
+                  >
+                    <div className="aspect-video relative overflow-hidden bg-white/5">
+                      <img
+                        src={item.url}
+                        alt={item.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                        <span className="text-white text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                          Ver projeto <ExternalLink size={14} />
+                        </span>
+                      </div>
+                      {item.images && item.images.length > 0 && (
+                        <div className="absolute top-4 right-4 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-bold text-white">
+                          +{item.images.length} fotos
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-6">
+                      <h3 className="font-bold text-white text-lg tracking-tight mb-1">{item.title}</h3>
+                      {item.description && (
+                        <p className="text-slate-500 text-sm line-clamp-2">{item.description}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                </Section>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── CONTATO ──────────────────────────────────────────────────────── */}
+      <section id="contato" className="py-32 px-6">
+        <div className="max-w-4xl mx-auto">
+          <Section className="text-center mb-16">
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 block">Vamos conversar</span>
+            <h2 className="text-4xl md:text-6xl font-display font-bold text-white tracking-tighter mb-6">
+              Tem um projeto<br />em mente?
+            </h2>
+            <p className="text-slate-400 text-lg max-w-xl mx-auto">
+              Estou disponível para novos projetos. Vamos transformar sua ideia em realidade.
+            </p>
+          </Section>
+
+          <Section>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              {[
+                { icon: <Mail size={22} />, label: 'E-mail', value: 'niklausadm@gmail.com', href: 'mailto:niklausadm@gmail.com' },
+                { icon: <Instagram size={22} />, label: 'Instagram', value: '@niklaus.dev', href: 'https://instagram.com' },
+                { icon: <Github size={22} />, label: 'GitHub', value: 'github.com/niklaus', href: 'https://github.com' },
+              ].map(item => (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group p-6 bg-white/[0.02] border border-white/5 rounded-3xl flex items-center gap-4 hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all"
+                >
+                  <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-2xl group-hover:bg-indigo-500/20 transition-all">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">{item.label}</p>
+                    <p className="text-white font-bold text-sm">{item.value}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            <div className="p-10 bg-gradient-to-br from-indigo-600/20 to-purple-600/10 rounded-[3rem] border border-indigo-500/20 text-center">
+              <h3 className="text-2xl font-bold text-white mb-3">Pronto para começar?</h3>
+              <p className="text-slate-400 mb-8">Entre em contato e receba um orçamento personalizado sem compromisso.</p>
+              <a
+                href="mailto:niklausadm@gmail.com"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-500 transition-all shadow-2xl shadow-indigo-500/30 group"
+              >
+                Solicitar Orçamento <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </a>
+            </div>
+          </Section>
+        </div>
+      </section>
+
+      {/* ── FOOTER ───────────────────────────────────────────────────────── */}
+      <footer className="py-10 px-6 border-t border-white/5">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <span className="text-xl font-display font-bold tracking-tighter text-white">
+            NIKLAUS<span className="text-indigo-500">.</span>
+          </span>
+          <p className="text-slate-600 text-sm">
+            © {new Date().getFullYear()} Niklaus Systems. Todos os direitos reservados.
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            className="text-xs text-slate-700 hover:text-slate-500 transition-colors flex items-center gap-1"
+          >
+            <Shield size={12} /> Área administrativa
+          </button>
+        </div>
+      </footer>
+
+      {/* ── LIGHTBOX ─────────────────────────────────────────────────────── */}
+      {selected && <Lightbox item={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
