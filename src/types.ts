@@ -1,5 +1,5 @@
 export interface Client {
-  id: number;
+  id: string;
   name: string;
   contact: string;
   notes: string;
@@ -7,8 +7,8 @@ export interface Client {
 }
 
 export interface Service {
-  id: number;
-  client_id: number;
+  id: string;
+  client_id: string;
   client_name?: string;
   name: string;
   status: 'ongoing' | 'finished';
@@ -18,18 +18,18 @@ export interface Service {
 }
 
 export interface GalleryImage {
-  id: number;
-  gallery_id: number;
+  id: string;
+  gallery_id: string;
   url: string;
 }
 
 export interface GalleryItem {
-  id: number;
+  id: string;
   title: string;
   description?: string;
   type: 'image' | 'video';
   url: string;
-  images?: GalleryImage[];
+  images?: { url: string }[];
   created_at: string;
 }
 
