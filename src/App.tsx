@@ -15,15 +15,15 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/"      element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="finance" element={<AdminFinance />} />
-            <Route path="gallery" element={<AdminGallery />} />
-            <Route path="clients" element={<AdminClients />} />
-            <Route path="services" element={<AdminServices />} />
-            <Route path="settings" element={<AdminSettings />} />
+            <Route index             element={<AdminDashboard />} />
+            <Route path="finance"    element={<AdminFinance />} />
+            <Route path="gallery"    element={<AdminGallery />} />
+            <Route path="clients"    element={<AdminClients />} />
+            <Route path="services"   element={<AdminServices />} />
+            <Route path="settings"   element={<AdminSettings />} />
           </Route>
         </Routes>
       </Router>
