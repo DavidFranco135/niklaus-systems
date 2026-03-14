@@ -9,6 +9,7 @@ import AdminClients from './AdminClients';
 import AdminServices from './AdminServices';
 import AdminFinance from './AdminFinance';
 import AdminSettings from './AdminSettings';
+import AdminPageManager from './AdminPageManager';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="gallery"    element={<AdminGallery />} />
             <Route path="clients"    element={<AdminClients />} />
             <Route path="services"   element={<AdminServices />} />
+            <Route path="page"       element={<AdminPageManager />} />
             <Route path="settings"   element={<AdminSettings />} />
           </Route>
         </Routes>
