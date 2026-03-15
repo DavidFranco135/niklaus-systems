@@ -233,11 +233,22 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="relative">
-              <div className="aspect-square rounded-[3rem] bg-gradient-to-br from-indigo-600/20 to-purple-600/10 border border-white/5 overflow-hidden">
-                <img src={content.cover_photo} alt="Profile" className="w-full h-full object-cover opacity-60 mix-blend-luminosity" referrerPolicy="no-referrer" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
+              {/* Card: foto de fundo + logo centralizada */}
+              <div className="aspect-square rounded-[3rem] border border-white/10 overflow-hidden relative">
+                <img src={content.cover_photo} alt="Cover" className="w-full h-full object-cover opacity-40" referrerPolicy="no-referrer" />
+                <div className="absolute inset-0 bg-[#050505]/50" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#050505]/80 via-transparent to-[#050505]/30" />
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 via-transparent to-purple-600/10" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8">
+                  <svg viewBox="0 0 520 140" className="w-full max-w-[360px]" xmlns="http://www.w3.org/2000/svg">
+                    <text fontFamily="'Outfit', sans-serif" fontWeight="800" fontSize="100" letterSpacing="-4" fill="white" x="0" y="108">
+                      NIKLAUS<tspan fill="#6366f1">.</tspan>
+                    </text>
+                  </svg>
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Software Development</p>
+                </div>
               </div>
-              <div className="absolute -bottom-6 -right-6 p-6 bg-indigo-600 rounded-3xl shadow-2xl shadow-indigo-600/30"><Code2 size={32} className="text-white" /></div>
+              <div className="absolute -bottom-6 -right-6 p-5 bg-indigo-600 rounded-3xl shadow-2xl shadow-indigo-600/30"><Code2 size={28} className="text-white" /></div>
             </div>
           </Section>
         </div>
