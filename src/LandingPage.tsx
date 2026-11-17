@@ -9,6 +9,7 @@ import {
 import { collection, getDocs, doc, getDoc, orderBy, query } from 'firebase/firestore';
 import { db } from './firebase';
 import { GalleryItem } from './types';
+import { W, fallbackToOriginal, imgSrc, preload } from './lib/img';
 import { installClickTracking, trackClick, trackVisit } from './lib/analytics';
 
 /** Link do WhatsApp (aceita número com ou sem DDI 55). */
@@ -84,6 +85,7 @@ const Lightbox = ({ item, onClose }: { item: GalleryItem; onClose: () => void })
     typeof img === 'string' ? img : img.url
   );
   const images = [item.url, ...extraImages].filter(Boolean);
+  useEffect(() => { preload(images, W.large); }, [item.id]);
 
   // Registra cada foto vista dentro do projeto (uma vez por abertura).
   const seen = useRef(new Set<number>());
@@ -148,7 +150,9 @@ const Lightbox = ({ item, onClose }: { item: GalleryItem; onClose: () => void })
           key={idx}
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
-          src={images[idx]}
+          src={imgSrc(images[idx], W.large)}
+          onError={fallbackToOriginal(images[idx])}
+          decoding="async"
           alt={item.title}
           className="w-full max-h-[65vh] object-contain rounded-2xl sm:rounded-3xl"
           referrerPolicy="no-referrer"
@@ -195,11 +199,22 @@ const Lightbox = ({ item, onClose }: { item: GalleryItem; onClose: () => void })
   );
 };
 
+// Cache local do conteúdo (deixa a segunda visita instantânea).
+const CACHE_KEY = 'nk-site-cache-v1';
+function readCache(): { content: Partial<SiteContent>; gallery: GalleryItem[] } | null {
+  try { const raw = localStorage.getItem(CACHE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+function writeCache(v: { content: Partial<SiteContent>; gallery: GalleryItem[] }) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(v)); } catch { /* cheio */ }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate                = useNavigate();
-  const [content, setContent]   = useState<SiteContent>(DEFAULTS);
-  const [gallery, setGallery]   = useState<GalleryItem[]>([]);
+  const [cached] = useState(readCache);
+  const [content, setContent]   = useState<SiteContent>({ ...DEFAULTS, ...(cached?.content || {}) });
+  const [gallery, setGallery]   = useState<GalleryItem[]>(cached?.gallery || []);
+  const [ready, setReady]       = useState(!!cached);
   const [selected, setSelected] = useState<GalleryItem | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -209,11 +224,18 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    getDoc(doc(db, 'settings', 'company')).then(snap => {
-      if (snap.exists()) setContent(prev => ({ ...prev, ...snap.data() }));
-    });
-    getDocs(query(collection(db, 'gallery'), orderBy('created_at', 'desc'))).then(snap => {
-      setGallery(snap.docs.map(d => ({ id: d.id, ...d.data() } as GalleryItem)));
+    // Mostra na hora o que ficou guardado da última visita e atualiza em seguida.
+    Promise.all([
+      getDoc(doc(db, 'settings', 'company')).then(snap => (snap.exists() ? snap.data() : {})).catch(() => null),
+      getDocs(query(collection(db, 'gallery'), orderBy('created_at', 'desc')))
+        .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as GalleryItem))).catch(() => null),
+    ]).then(([c, g]) => {
+      if (c) setContent({ ...DEFAULTS, ...c });
+      if (g) setGallery(g);
+      setReady(true);
+      if (c && g) writeCache({ content: c, gallery: g });
+      // Adianta as fotos do portfólio (tamanho do card) depois que a página abriu.
+      if (g) setTimeout(() => preload(g.map(x => x.url), W.card), 1500);
     });
   }, []);
 
@@ -305,7 +327,7 @@ export default function LandingPage() {
       <section data-section="inicio" className="relative min-h-[100dvh] flex items-center justify-center overflow-hidden pt-20">
         {/* Fundo */}
         <div className="absolute inset-0">
-          <img src={content.cover_photo} alt="" className="w-full h-full object-cover opacity-20" referrerPolicy="no-referrer" />
+          {ready && <img src={imgSrc(content.cover_photo, W.hero)} onError={fallbackToOriginal(content.cover_photo)} alt="" fetchPriority="high" className="w-full h-full object-cover opacity-20" referrerPolicy="no-referrer" />}
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505]" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-transparent to-[#050505]" />
         </div>
@@ -387,7 +409,7 @@ export default function LandingPage() {
             {/* Card logo */}
             <div className="relative mt-4 lg:mt-0">
               <div className="aspect-square rounded-[2rem] sm:rounded-[3rem] border border-white/10 overflow-hidden relative">
-                <img src={content.cover_photo} alt="" className="w-full h-full object-cover opacity-40" referrerPolicy="no-referrer" />
+                {ready && <img src={imgSrc(content.cover_photo, W.card)} onError={fallbackToOriginal(content.cover_photo)} alt="" loading="lazy" className="w-full h-full object-cover opacity-40" referrerPolicy="no-referrer" />}
                 <div className="absolute inset-0 bg-[#050505]/50" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#050505]/80 via-transparent to-[#050505]/30" />
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 via-transparent to-purple-600/10" />
@@ -462,12 +484,16 @@ export default function LandingPage() {
                   <Section key={item.id}>
                     <div
                       onClick={() => setSelected(item)}
+                      onPointerEnter={() => preload([item.url, ...extras], W.large)}
+                      onTouchStart={() => preload([item.url, ...extras], W.large)}
                       data-track={`Projeto: ${item.title}`}
                       className="cursor-pointer bg-white/[0.02] rounded-2xl sm:rounded-[2.5rem] border border-white/5 overflow-hidden active:border-indigo-500/30 transition-all touch-manipulation"
                     >
                       <div className="aspect-video relative overflow-hidden bg-white/5">
                         <img
-                          src={item.url}
+                          src={imgSrc(item.url, W.card)}
+                          onError={fallbackToOriginal(item.url)}
+                          decoding="async"
                           alt={item.title}
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
