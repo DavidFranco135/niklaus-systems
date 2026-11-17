@@ -41,6 +41,15 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null;
     }
+    // Contador de visitas: o site grava eventos anônimos; só o admin lê.
+    match /site_events/{id} {
+      allow create: if request.resource.data.type in ['visit', 'click']
+        && request.resource.data.keys().hasOnly(['type','visitor','day','at','source','referrer','campaign','device','os','region','lang','target','section'])
+        && request.resource.data.visitor is string && request.resource.data.visitor.size() <= 64
+        && request.resource.data.day is string && request.resource.data.day.size() == 10
+        && request.resource.data.at == request.time;
+      allow read, delete: if request.auth != null;
+    }
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

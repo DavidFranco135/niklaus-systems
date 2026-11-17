@@ -7,6 +7,7 @@ import {
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { Stats, Service } from './types';
+import AdminVisits from './AdminVisits';
 
 const StatCard = ({ title, value, icon, color, trend }: any) => (
   <div className="bg-white/[0.03] p-8 rounded-[2.5rem] border border-white/5 backdrop-blur-md">
@@ -156,6 +157,8 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      <AdminVisits />
     </div>
   );
 }

@@ -4,11 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight, ExternalLink, Code2, Smartphone, Globe,
   Layers, ChevronDown, X, ChevronLeft, ChevronRight,
-  Mail, Instagram, Github, Menu, Shield
+  Mail, Instagram, Github, Menu, Shield, MessageCircle
 } from 'lucide-react';
 import { collection, getDocs, doc, getDoc, orderBy, query } from 'firebase/firestore';
 import { db } from './firebase';
 import { GalleryItem } from './types';
+import { installClickTracking, trackVisit } from './lib/analytics';
+
+/** Link do WhatsApp (aceita número com ou sem DDI 55). */
+export function whatsappLink(phone: string, msg: string) {
+  let digits = (phone || '').replace(/\D/g, '');
+  if (digits.length <= 11) digits = `55${digits}`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg || '')}`;
+}
 
 const DEFAULTS = {
   cover_photo: 'https://picsum.photos/seed/niklaus-dark/1920/1080',
@@ -38,6 +46,8 @@ const DEFAULTS = {
   contact_subtitle: 'Estou disponível para novos projetos. Vamos transformar sua ideia em realidade.',
   contact_cta: 'Solicitar Orçamento',
   contact_email: 'niklausadm@gmail.com',
+  contact_whatsapp: '21997155702',
+  contact_whatsapp_msg: 'Olá! Vim pelo site da Niklaus Systems e gostaria de pedir um orçamento.',
   contact_instagram: '@niklaus.dev',
   contact_instagram_url: 'https://instagram.com',
   contact_github: 'github.com/niklaus',
@@ -110,6 +120,7 @@ const Lightbox = ({ item, onClose }: { item: GalleryItem; onClose: () => void })
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-3 sm:p-6"
+      data-section="lightbox"
       onClick={onClose}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
@@ -184,6 +195,11 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
+    trackVisit();
+    return installClickTracking();
+  }, []);
+
+  useEffect(() => {
     getDoc(doc(db, 'settings', 'company')).then(snap => {
       if (snap.exists()) setContent(prev => ({ ...prev, ...snap.data() }));
     });
@@ -195,6 +211,12 @@ export default function LandingPage() {
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     setMenuOpen(false);
+  };
+
+  const waUrl = whatsappLink(content.contact_whatsapp || DEFAULTS.contact_whatsapp, content.contact_whatsapp_msg || DEFAULTS.contact_whatsapp_msg);
+  const fmtPhone = (p: string) => {
+    const d = (p || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+    return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : p;
   };
 
   const services = [
@@ -271,7 +293,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[100dvh] flex items-center justify-center overflow-hidden pt-20">
+      <section data-section="inicio" className="relative min-h-[100dvh] flex items-center justify-center overflow-hidden pt-20">
         {/* Fundo */}
         <div className="absolute inset-0">
           <img src={content.cover_photo} alt="" className="w-full h-full object-cover opacity-20" referrerPolicy="no-referrer" />
@@ -305,12 +327,15 @@ export default function LandingPage() {
                 {content.hero_cta_primary}
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </button>
-              <button
-                onClick={() => scrollTo('contato')}
+              <a
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-track="WhatsApp (topo)"
                 className="w-full sm:w-auto px-7 py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-bold hover:bg-white/10 active:bg-white/15 transition-all touch-manipulation"
               >
-                {content.hero_cta_secondary}
-              </button>
+                <MessageCircle size={18} className="inline -mt-0.5 mr-2" />{content.hero_cta_secondary}
+              </a>
             </div>
           </motion.div>
         </div>
@@ -428,6 +453,7 @@ export default function LandingPage() {
                   <Section key={item.id}>
                     <div
                       onClick={() => setSelected(item)}
+                      data-track={`Projeto: ${item.title}`}
                       className="cursor-pointer bg-white/[0.02] rounded-2xl sm:rounded-[2.5rem] border border-white/5 overflow-hidden active:border-indigo-500/30 transition-all touch-manipulation"
                     >
                       <div className="aspect-video relative overflow-hidden bg-white/5">
@@ -477,8 +503,9 @@ export default function LandingPage() {
           </Section>
 
           <Section>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-10 lg:mb-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-10 lg:mb-12">
               {[
+                { href: waUrl, icon: <MessageCircle size={20} />, label: 'WhatsApp', value: fmtPhone(content.contact_whatsapp || DEFAULTS.contact_whatsapp) },
                 { href: `mailto:${content.contact_email}`, icon: <Mail size={20} />, label: 'E-mail', value: content.contact_email },
                 { href: content.contact_instagram_url, icon: <Instagram size={20} />, label: 'Instagram', value: content.contact_instagram },
                 { href: content.contact_github_url, icon: <Github size={20} />, label: 'GitHub', value: content.contact_github },
@@ -486,6 +513,7 @@ export default function LandingPage() {
                 <a
                   key={item.label}
                   href={item.href}
+                  data-track={`Contato: ${item.label}`}
                   target="_blank"
                   rel="noreferrer"
                   className="group p-4 sm:p-6 bg-white/[0.02] border border-white/5 rounded-2xl sm:rounded-3xl flex items-center gap-3 sm:gap-4 hover:border-indigo-500/30 active:border-indigo-500/40 hover:bg-indigo-500/5 active:bg-indigo-500/5 transition-all touch-manipulation"
@@ -505,10 +533,13 @@ export default function LandingPage() {
               <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Pronto para começar?</h3>
               <p className="text-slate-400 mb-6 sm:mb-8 text-sm sm:text-base">Entre em contato e receba um orçamento personalizado sem compromisso.</p>
               <a
-                href={`mailto:${content.contact_email}`}
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-track="Pedir orçamento (WhatsApp)"
                 className="inline-flex items-center gap-2 px-7 sm:px-8 py-3.5 sm:py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-500 active:bg-indigo-700 transition-all shadow-2xl shadow-indigo-500/30 touch-manipulation"
               >
-                {content.contact_cta} <ArrowRight size={18} />
+                <MessageCircle size={18} /> {content.contact_cta} <ArrowRight size={18} />
               </a>
             </div>
           </Section>

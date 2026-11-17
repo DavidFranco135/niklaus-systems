@@ -37,6 +37,8 @@ const DEFAULTS: Record<string, string> = {
   contact_subtitle: 'Estou disponível para novos projetos. Vamos transformar sua ideia em realidade.',
   contact_cta: 'Solicitar Orçamento',
   contact_email: 'niklausadm@gmail.com',
+  contact_whatsapp: '21997155702',
+  contact_whatsapp_msg: 'Olá! Vim pelo site da Niklaus Systems e gostaria de pedir um orçamento.',
   contact_instagram: '@niklaus.dev',
   contact_instagram_url: 'https://instagram.com',
   contact_github: 'github.com/niklaus',
@@ -302,6 +304,14 @@ export default function AdminPageManager() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div>
+            <Label>WhatsApp (botão de orçamento)</Label>
+            <Input value={data.contact_whatsapp} onChange={v => set('contact_whatsapp', v)} placeholder="21997155702" />
+          </div>
+          <div>
+            <Label>Mensagem inicial do WhatsApp</Label>
+            <Input value={data.contact_whatsapp_msg} onChange={v => set('contact_whatsapp_msg', v)} />
+          </div>
           <div>
             <Label>E-mail de contato</Label>
             <Input value={data.contact_email} onChange={v => set('contact_email', v)} placeholder="seu@email.com" />
