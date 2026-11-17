@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { Eye, MousePointerClick, UserRound, Globe2, Smartphone, MapPin, RefreshCw, ShieldOff } from 'lucide-react';
+import { collection, getDocs, orderBy, query, where, Timestamp } from 'firebase/firestore';
+import { Images, Eye, MousePointerClick, UserRound, Globe2, Smartphone, MapPin, RefreshCw, ShieldOff } from 'lucide-react';
 import { db } from './firebase';
 import { isOwnBrowser, setOwnBrowser, today } from './lib/analytics';
+import { GalleryItem } from './types';
 
 type Ev = {
   type: 'visit' | 'click';
@@ -55,12 +56,12 @@ const Box = ({ title, icon, children }: { title: string; icon: React.ReactNode; 
   </div>
 );
 
-const Bars = ({ rows, empty = 'Sem dados ainda' }: { rows: [string, number][]; empty?: string }) => {
+const Bars = ({ rows, empty = 'Sem dados ainda', limit = 8 }: { rows: [string, number][]; empty?: string; limit?: number }) => {
   if (!rows.length) return <p className="text-slate-600 text-sm">{empty}</p>;
   const max = rows[0][1] || 1;
   return (
-    <ul className="space-y-3">
-      {rows.slice(0, 8).map(([k, v]) => (
+    <ul className="space-y-3 max-h-[26rem] overflow-y-auto pr-1">
+      {rows.slice(0, limit).map(([k, v]) => (
         <li key={k}>
           <div className="flex justify-between text-sm mb-1.5 gap-3">
             <span className="text-slate-300 font-medium truncate">{k}</span>
@@ -81,6 +82,13 @@ export default function AdminVisits() {
   const [error, setError] = useState('');
   const [own, setOwn] = useState(isOwnBrowser());
   const [tick, setTick] = useState(0);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+
+  useEffect(() => {
+    getDocs(query(collection(db, 'gallery'), orderBy('created_at', 'desc')))
+      .then(snap => setGallery(snap.docs.map(d => ({ id: d.id, ...d.data() } as GalleryItem))))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setError('');
@@ -122,11 +130,43 @@ export default function AdminVisits() {
       sources: countBy(visits, v => v.source),
       devices: countBy(visits, v => `${v.device || '?'} · ${v.os || '?'}`),
       regions: countBy(visits, v => regionLabel(v.region)),
-      targets: countBy(clicks, c => c.target),
+      targets: countBy(clicks.filter(c => !/^Foto \d+ · /.test(c.target || '')), c => c.target),
+      clickList: clicks,
       sections: countBy(clicks, c => SECTION_NAMES[c.section || ''] || c.section),
       recent,
     };
   }, [events, range]);
+
+  const portfolio = useMemo(() => {
+    if (!data) return [];
+    const opens = new Map<string, { n: number; people: Set<string> }>();
+    const photos = new Map<string, Map<number, number>>();
+    data.clickList.forEach(c => {
+      const t = c.target || '';
+      const mo = t.match(/^Projeto: (.+)$/);
+      if (mo) {
+        const o = opens.get(mo[1]) || { n: 0, people: new Set<string>() };
+        o.n++; o.people.add(c.visitor); opens.set(mo[1], o);
+      }
+      const mf = t.match(/^Foto (\d+) · (.+)$/);
+      if (mf) {
+        const m = photos.get(mf[2]) || new Map<number, number>();
+        m.set(+mf[1], (m.get(+mf[1]) || 0) + 1); photos.set(mf[2], m);
+      }
+    });
+    const titles = new Set([...gallery.map(g => g.title), ...opens.keys()]);
+    return [...titles].map(title => {
+      const g = gallery.find(x => x.title === title);
+      const total = g ? 1 + (g.images?.length || 0) : Math.max(0, ...[...(photos.get(title)?.keys() || [])]);
+      const ph = photos.get(title) || new Map<number, number>();
+      return {
+        title, thumb: g?.url, removed: !g,
+        opens: opens.get(title)?.n || 0,
+        people: opens.get(title)?.people.size || 0,
+        photos: Array.from({ length: total }, (_, i) => ph.get(i + 1) || 0),
+      };
+    }).sort((a, b) => b.opens - a.opens);
+  }, [data, gallery]);
 
   const maxDay = Math.max(1, ...(data?.days.map(d => d.visits) || [1]));
 
@@ -185,9 +225,40 @@ export default function AdminVisits() {
             </div>
           </Box>
 
+          <Box title="Portfólio — cliques em cada projeto e foto" icon={<Images size={16} />}>
+            {portfolio.length === 0 ? <p className="text-slate-600 text-sm">Nenhum projeto cadastrado</p> : (
+              <ul className="divide-y divide-white/5">
+                {portfolio.map(p => (
+                  <li key={p.title} className="flex items-center gap-4 py-3">
+                    {p.thumb
+                      ? <img src={p.thumb} alt="" className="w-16 h-11 rounded-lg object-cover shrink-0 bg-white/5" referrerPolicy="no-referrer" />
+                      : <div className="w-16 h-11 rounded-lg bg-white/5 shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white font-bold text-sm truncate">{p.title}{p.removed && <span className="text-slate-600 font-normal"> (removido)</span>}</p>
+                      {p.photos.length > 1 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {p.photos.map((n, i) => (
+                            <span key={i} title={`Foto ${i + 1}: vista ${n} vez(es)`}
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${n ? 'bg-indigo-500/15 text-indigo-300' : 'bg-white/5 text-slate-600'}`}>
+                              Foto {i + 1}: {n}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-2xl font-display font-bold text-white leading-none">{p.opens}</p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">{p.opens === 1 ? 'clique' : 'cliques'} · {p.people} pess.</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Box>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <Box title="Onde clicaram" icon={<MousePointerClick size={16} />}>
-              <Bars rows={data.targets} empty="Nenhum clique ainda" />
+            <Box title="Todos os botões clicados" icon={<MousePointerClick size={16} />}>
+              <Bars rows={data.targets} empty="Nenhum clique ainda" limit={100} />
             </Box>
             <Box title="Seções mais clicadas" icon={<MousePointerClick size={16} />}>
               <Bars rows={data.sections} empty="Nenhum clique ainda" />

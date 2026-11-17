@@ -9,7 +9,7 @@ import {
 import { collection, getDocs, doc, getDoc, orderBy, query } from 'firebase/firestore';
 import { db } from './firebase';
 import { GalleryItem } from './types';
-import { installClickTracking, trackVisit } from './lib/analytics';
+import { installClickTracking, trackClick, trackVisit } from './lib/analytics';
 
 /** Link do WhatsApp (aceita número com ou sem DDI 55). */
 export function whatsappLink(phone: string, msg: string) {
@@ -85,6 +85,14 @@ const Lightbox = ({ item, onClose }: { item: GalleryItem; onClose: () => void })
   );
   const images = [item.url, ...extraImages].filter(Boolean);
 
+  // Registra cada foto vista dentro do projeto (uma vez por abertura).
+  const seen = useRef(new Set<number>());
+  useEffect(() => {
+    if (seen.current.has(idx)) return;
+    seen.current.add(idx);
+    trackClick(`Foto ${idx + 1} · ${item.title}`, 'lightbox');
+  }, [idx, item.title]);
+
   const prev = () => setIdx(p => (p - 1 + images.length) % images.length);
   const next = () => setIdx(p => (p + 1) % images.length);
 
@@ -121,6 +129,7 @@ const Lightbox = ({ item, onClose }: { item: GalleryItem; onClose: () => void })
       animate={{ opacity: 1 }}
       className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-3 sm:p-6"
       data-section="lightbox"
+      data-notrack
       onClick={onClose}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}

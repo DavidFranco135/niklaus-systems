@@ -137,7 +137,7 @@ export function trackClick(target: string, section = '') {
 export function installClickTracking(): () => void {
   const onClick = (e: MouseEvent) => {
     const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-track],a,button');
-    if (!el) return;
+    if (!el || el.closest('[data-notrack]')) return;
     const label = el.dataset.track
       || el.getAttribute('aria-label')
       || (el.textContent || '').replace(/\s+/g, ' ').trim();
